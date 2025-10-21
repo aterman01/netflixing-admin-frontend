@@ -2,6 +2,21 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
+// Simple hash function for basic security
+const simpleHash = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString();
+};
+
+// Store the hashed password - replace this hash with your password's hash
+// To get your password hash, temporarily add: console.log(simpleHash("YourPassword"))
+const STORED_PASSWORD_HASH = "-1428485891"; // Hash of "At100100!?"
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -16,8 +31,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check if user is already logged in
-    const token = localStorage.getItem('admin_token');
-    const expiry = localStorage.getItem('admin_token_expiry');
+    const token = sessionStorage.getItem('admin_token');
+    const expiry = sessionStorage.getItem('admin_token_expiry');
     
     if (token && expiry) {
       const now = new Date().getTime();
@@ -25,43 +40,38 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
       } else {
         // Token expired
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_token_expiry');
+        sessionStorage.removeItem('admin_token');
+        sessionStorage.removeItem('admin_token_expiry');
       }
     }
     setIsLoading(false);
   }, []);
 
   const login = (password) => {
-    // Get password from environment variable
-    const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+    // Hash the input password and compare
+    const inputHash = simpleHash(password.trim());
     
-    // Debug log (remove after testing)
-    console.log('Checking password...');
-    console.log('Env var exists:', !!correctPassword);
-    console.log('Password length:', password?.length, 'Expected length:', correctPassword?.length);
+    console.log('Login attempt');
+    console.log('Input hash:', inputHash);
+    console.log('Stored hash:', STORED_PASSWORD_HASH);
+    console.log('Match:', inputHash === STORED_PASSWORD_HASH);
     
-    // Trim both passwords to avoid whitespace issues
-    const trimmedInput = password?.trim();
-    const trimmedCorrect = correctPassword?.trim();
-    
-    if (trimmedInput && trimmedCorrect && trimmedInput === trimmedCorrect) {
-      const token = btoa(`admin:${Date.now()}`); // Simple token
+    if (inputHash === STORED_PASSWORD_HASH) {
+      const token = btoa(`admin:${Date.now()}`);
       const expiry = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
       
-      localStorage.setItem('admin_token', token);
-      localStorage.setItem('admin_token_expiry', expiry.toString());
+      sessionStorage.setItem('admin_token', token);
+      sessionStorage.setItem('admin_token_expiry', expiry.toString());
       setIsAuthenticated(true);
       return true;
     }
     
-    console.log('Password mismatch');
     return false;
   };
 
   const logout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_token_expiry');
+    sessionStorage.removeItem('admin_token');
+    sessionStorage.removeItem('admin_token_expiry');
     setIsAuthenticated(false);
   };
 
