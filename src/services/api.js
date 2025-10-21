@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://netflixing-backend-production.up.railway.app';
+const API_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
 
 export const api = {
   get: async (endpoint) => {
