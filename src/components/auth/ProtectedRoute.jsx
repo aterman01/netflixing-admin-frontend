@@ -1,5 +1,5 @@
-import { useAuth } from '../contexts/AuthContext';
-import LoginPage from '../components/auth/LoginPage';
+import { useAuth } from '../../contexts/AuthContext';
+import LoginPage from './LoginPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();

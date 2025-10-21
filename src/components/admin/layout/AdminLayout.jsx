@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, LogOut } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import TabNavigation from './TabNavigation';
 
 const AdminLayout = ({ activeTab, onTabChange, children }) => {
