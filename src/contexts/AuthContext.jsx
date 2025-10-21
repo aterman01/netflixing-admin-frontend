@@ -33,10 +33,19 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (password) => {
-    // Check against environment variable
-    const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin123';
+    // Get password from environment variable
+    const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
     
-    if (password === correctPassword) {
+    // Debug log (remove after testing)
+    console.log('Checking password...');
+    console.log('Env var exists:', !!correctPassword);
+    console.log('Password length:', password?.length, 'Expected length:', correctPassword?.length);
+    
+    // Trim both passwords to avoid whitespace issues
+    const trimmedInput = password?.trim();
+    const trimmedCorrect = correctPassword?.trim();
+    
+    if (trimmedInput && trimmedCorrect && trimmedInput === trimmedCorrect) {
       const token = btoa(`admin:${Date.now()}`); // Simple token
       const expiry = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
       
@@ -45,6 +54,8 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return true;
     }
+    
+    console.log('Password mismatch');
     return false;
   };
 
