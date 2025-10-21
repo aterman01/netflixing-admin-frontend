@@ -13,9 +13,8 @@ const simpleHash = (str) => {
   return hash.toString();
 };
 
-// Store the hashed password - replace this hash with your password's hash
-// To get your password hash, temporarily add: console.log(simpleHash("YourPassword"))
-const STORED_PASSWORD_HASH = "-1428485891"; // Hash of "At100100!?"
+// Store the hashed password
+const STORED_PASSWORD_HASH = "1469997041"; // Your actual password hash
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -50,11 +49,6 @@ export const AuthProvider = ({ children }) => {
   const login = (password) => {
     // Hash the input password and compare
     const inputHash = simpleHash(password.trim());
-    
-    console.log('Login attempt');
-    console.log('Input hash:', inputHash);
-    console.log('Stored hash:', STORED_PASSWORD_HASH);
-    console.log('Match:', inputHash === STORED_PASSWORD_HASH);
     
     if (inputHash === STORED_PASSWORD_HASH) {
       const token = btoa(`admin:${Date.now()}`);
