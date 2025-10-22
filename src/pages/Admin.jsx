@@ -5,6 +5,8 @@ import AgentsTab from './admin/AgentsTab';
 import ContentTab from './admin/ContentTab';
 import RPMTab from './admin/RPMTab';
 import WorkflowsTab from './admin/WorkflowsTab';
+import OrchestratorTab from './admin/OrchestratorTab';
+import N8NStatusTab from './admin/N8NStatusTab';
 import AnalyticsTab from './admin/AnalyticsTab';
 import SystemTab from './admin/SystemTab';
 import SettingsTab from './admin/SettingsTab';
@@ -24,6 +26,10 @@ const Admin = () => {
         return <RPMTab />;
       case 'workflows':
         return <WorkflowsTab />;
+      case 'orchestrator':
+        return <OrchestratorTab />;
+      case 'n8n-status':
+        return <N8NStatusTab />;
       case 'analytics':
         return <AnalyticsTab />;
       case 'system':

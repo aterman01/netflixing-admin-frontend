@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, FileText, Image, Workflow, BarChart3, Activity, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Image, Workflow, Brain, Zap, BarChart3, Activity, Settings } from 'lucide-react';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -6,6 +6,8 @@ const tabs = [
   { id: 'content', label: 'Content', icon: FileText },
   { id: 'avatars', label: 'Avatars', icon: Image },
   { id: 'workflows', label: 'Workflows', icon: Workflow },
+  { id: 'orchestrator', label: 'Orchestrator', icon: Brain },
+  { id: 'n8n-status', label: 'N8N Status', icon: Zap },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'system', label: 'System', icon: Activity },
   { id: 'settings', label: 'Settings', icon: Settings },
