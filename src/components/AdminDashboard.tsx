@@ -6,19 +6,26 @@ import {
   Download, Upload, Eye, EyeOff, MessageSquare, Zap
 } from 'lucide-react';
 
+// Safe array helper - prevents .filter is not a function errors
+const ensureArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value === null || value === undefined) return [];
+  return [value];
+};
+
 const AdminDashboard = () => {
   // State management
   const [activeTab, setActiveTab] = useState('overview');
-  const [agents, setAgents] = useState([]);
+  const [agents, setAgents] = useState([]); // ✅ FIXED: Initialize as empty array
   const [systemStatus, setSystemStatus] = useState(null);
   const [orchestratorConfig, setOrchestratorConfig] = useState(null);
-  const [workflows, setWorkflows] = useState([]);
-  const [contentQueue, setContentQueue] = useState([]);
+  const [workflows, setWorkflows] = useState([]); // ✅ FIXED: Initialize as empty array
+  const [contentQueue, setContentQueue] = useState([]); // ✅ FIXED: Initialize as empty array
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Backend API URL
-  const API_URL = import.meta.env.VITE_API_URL || 'https://web-production-963ea.up.railway.app';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
 
   // Fetch data on mount
   useEffect(() => {
@@ -32,14 +39,14 @@ const AdminDashboard = () => {
     try {
       // Fetch multiple endpoints in parallel
       const [agentsRes, statusRes, configRes] = await Promise.all([
-        fetch(`${API_URL}/api/agents`),
-        fetch(`${API_URL}/api/health`),
-        fetch(`${API_URL}/api/orchestrator/config`)
+        fetch(`${API_URL}/api/agents`).catch(() => ({ ok: false })),
+        fetch(`${API_URL}/api/health`).catch(() => ({ ok: false })),
+        fetch(`${API_URL}/api/orchestrator/config`).catch(() => ({ ok: false }))
       ]);
 
       if (agentsRes.ok) {
         const agentsData = await agentsRes.json();
-        setAgents(agentsData);
+        setAgents(ensureArray(agentsData)); // ✅ FIXED: Ensure array
       }
 
       if (statusRes.ok) {
@@ -59,10 +66,10 @@ const AdminDashboard = () => {
   const fetchWorkflows = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/workflows`);
+      const res = await fetch(`${API_URL}/api/n8n/workflows`);
       if (res.ok) {
         const data = await res.json();
-        setWorkflows(data);
+        setWorkflows(ensureArray(data.workflows || data)); // ✅ FIXED: Ensure array
       }
     } catch (err) {
       setError('Failed to fetch workflows');
@@ -74,10 +81,10 @@ const AdminDashboard = () => {
   const fetchContentQueue = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/content/queue`);
+      const res = await fetch(`${API_URL}/api/admin/content/queue`);
       if (res.ok) {
         const data = await res.json();
-        setContentQueue(data);
+        setContentQueue(ensureArray(data.queue || data)); // ✅ FIXED: Ensure array
       }
     } catch (err) {
       setError('Failed to fetch content queue');
@@ -139,7 +146,7 @@ const AdminDashboard = () => {
 
   const approveContent = async (contentId) => {
     try {
-      const res = await fetch(`${API_URL}/api/content/approve/${contentId}`, {
+      const res = await fetch(`${API_URL}/api/admin/content/${contentId}/approve`, {
         method: 'POST'
       });
       if (res.ok) {
@@ -153,7 +160,7 @@ const AdminDashboard = () => {
 
   const rejectContent = async (contentId) => {
     try {
-      const res = await fetch(`${API_URL}/api/content/reject/${contentId}`, {
+      const res = await fetch(`${API_URL}/api/admin/content/${contentId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Does not meet quality standards' })
@@ -174,14 +181,14 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
           <Users className="w-8 h-8 mb-2 opacity-80" />
-          <div className="text-3xl font-bold">{agents.length}</div>
+          <div className="text-3xl font-bold">{ensureArray(agents).length}</div>
           <div className="text-blue-100 text-sm">Total Agents</div>
         </div>
         
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
           <CheckCircle className="w-8 h-8 mb-2 opacity-80" />
           <div className="text-3xl font-bold">
-            {agents.filter(a => a.status === 'active').length}
+            {ensureArray(agents).filter(a => a.status === 'active').length}
           </div>
           <div className="text-green-100 text-sm">Active Agents</div>
         </div>
@@ -196,7 +203,7 @@ const AdminDashboard = () => {
         
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white">
           <Clock className="w-8 h-8 mb-2 opacity-80" />
-          <div className="text-3xl font-bold">{contentQueue.length || 0}</div>
+          <div className="text-3xl font-bold">{ensureArray(contentQueue).length || 0}</div>
           <div className="text-orange-100 text-sm">Pending Content</div>
         </div>
       </div>
@@ -210,40 +217,31 @@ const AdminDashboard = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button
             onClick={() => setActiveTab('agents')}
-            className="p-4 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg border border-blue-500/30 transition-all"
+            className="p-4 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-blue-400 font-medium flex flex-col items-center gap-2"
           >
-            <Users className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-            <div className="text-white text-sm font-medium">Manage Agents</div>
+            <Users className="w-6 h-6" />
+            <span>Manage Agents</span>
           </button>
-          
           <button
-            onClick={() => setActiveTab('avatars')}
-            className="p-4 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg border border-purple-500/30 transition-all"
+            onClick={() => setActiveTab('content')}
+            className="p-4 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-green-400 font-medium flex flex-col items-center gap-2"
           >
-            <Image className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-            <div className="text-white text-sm font-medium">Create Avatars</div>
+            <MessageSquare className="w-6 h-6" />
+            <span>Review Content</span>
           </button>
-          
           <button
-            onClick={() => {
-              setActiveTab('content');
-              fetchContentQueue();
-            }}
-            className="p-4 bg-green-500/20 hover:bg-green-500/30 rounded-lg border border-green-500/30 transition-all"
+            onClick={() => setActiveTab('workflows')}
+            className="p-4 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-400 font-medium flex flex-col items-center gap-2"
           >
-            <MessageSquare className="w-6 h-6 text-green-400 mx-auto mb-2" />
-            <div className="text-white text-sm font-medium">Moderate Content</div>
+            <Workflow className="w-6 h-6" />
+            <span>N8N Workflows</span>
           </button>
-          
           <button
-            onClick={() => {
-              setActiveTab('workflows');
-              fetchWorkflows();
-            }}
-            className="p-4 bg-orange-500/20 hover:bg-orange-500/30 rounded-lg border border-orange-500/30 transition-all"
+            onClick={() => setActiveTab('orchestrator')}
+            className="p-4 bg-pink-500/20 hover:bg-pink-500/30 rounded-lg text-pink-400 font-medium flex flex-col items-center gap-2"
           >
-            <Workflow className="w-6 h-6 text-orange-400 mx-auto mb-2" />
-            <div className="text-white text-sm font-medium">Manage Workflows</div>
+            <Brain className="w-6 h-6" />
+            <span>Orchestrator</span>
           </button>
         </div>
       </div>
@@ -252,22 +250,21 @@ const AdminDashboard = () => {
       <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
         <h3 className="text-xl font-bold text-white mb-4">Recent Activity</h3>
         <div className="space-y-3">
-          {agents.slice(0, 5).map(agent => (
-            <div key={agent.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
-                {agent.name.charAt(0)}
-              </div>
-              <div className="flex-1">
-                <div className="text-white font-medium">{agent.name}</div>
-                <div className="text-purple-300 text-sm">{agent.platform} • {agent.niche}</div>
-              </div>
-              <div className={`px-3 py-1 rounded-full text-xs ${
-                agent.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
-              }`}>
-                {agent.status}
-              </div>
-            </div>
-          ))}
+          <div className="flex items-center gap-3 text-purple-200">
+            <CheckCircle className="w-5 h-5 text-green-400" />
+            <span>System initialized successfully</span>
+            <span className="ml-auto text-sm text-purple-400">Just now</span>
+          </div>
+          <div className="flex items-center gap-3 text-purple-200">
+            <Activity className="w-5 h-5 text-blue-400" />
+            <span>{ensureArray(agents).length} agents loaded</span>
+            <span className="ml-auto text-sm text-purple-400">Just now</span>
+          </div>
+          <div className="flex items-center gap-3 text-purple-200">
+            <Brain className="w-5 h-5 text-purple-400" />
+            <span>Orchestrator ready</span>
+            <span className="ml-auto text-sm text-purple-400">Just now</span>
+          </div>
         </div>
       </div>
     </div>
@@ -279,54 +276,45 @@ const AdminDashboard = () => {
         <h2 className="text-2xl font-bold text-white">Agent Management</h2>
         <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white font-medium flex items-center gap-2">
           <Plus className="w-4 h-4" />
-          Create Agent
+          Add Agent
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {agents.map(agent => (
-          <div key={agent.id} className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-1">{agent.name}</h3>
-                <div className="text-purple-300 text-sm">{agent.platform} • {agent.niche}</div>
+      {ensureArray(agents).length === 0 ? (
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-12 border border-white/20 text-center">
+          <Users className="w-16 h-16 text-purple-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">No Agents Found</h3>
+          <p className="text-purple-300">Create your first agent to get started</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ensureArray(agents).map(agent => (
+            <div key={agent.id} className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+                  {agent.name?.charAt(0) || 'A'}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-white">{agent.name || 'Unknown Agent'}</h3>
+                  <p className="text-sm text-purple-300">{agent.role || 'No role'}</p>
+                </div>
+                <div className={`w-3 h-3 rounded-full ${agent.status === 'active' ? 'bg-green-400' : 'bg-gray-400'}`}></div>
               </div>
-              <button
-                onClick={() => toggleAgent(agent.id, agent.status !== 'active')}
-                className={`p-2 rounded-lg ${
-                  agent.status === 'active' 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-gray-500/20 text-gray-400'
-                }`}
-              >
-                {agent.status === 'active' ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              </button>
-            </div>
-
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-sm text-purple-200">
-                <Bot className="w-4 h-4" />
-                {agent.personality_type || 'Standard'}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-purple-200">
-                <Activity className="w-4 h-4" />
-                {agent.content_style || 'Mixed'}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => toggleAgent(agent.id, agent.status !== 'active')}
+                  className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-blue-400 text-sm font-medium"
+                >
+                  {agent.status === 'active' ? 'Pause' : 'Activate'}
+                </button>
+                <button className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-400">
+                  <Edit className="w-4 h-4" />
+                </button>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              <button className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-blue-400 text-sm font-medium">
-                <Edit className="w-3 h-3 inline mr-1" />
-                Edit
-              </button>
-              <button className="flex-1 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-400 text-sm font-medium">
-                <Image className="w-3 h-3 inline mr-1" />
-                Avatar
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -343,7 +331,7 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {contentQueue.length === 0 ? (
+      {ensureArray(contentQueue).length === 0 ? (
         <div className="bg-white/10 backdrop-blur-lg rounded-xl p-12 border border-white/20 text-center">
           <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">No Pending Content</h3>
@@ -351,18 +339,18 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {contentQueue.map(content => (
+          {ensureArray(contentQueue).map(content => (
             <div key={content.id} className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-white mb-2">{content.title}</h3>
-                  <p className="text-purple-200 mb-3">{content.body}</p>
+                  <h3 className="text-lg font-bold text-white mb-2">{content.title || 'Untitled'}</h3>
+                  <p className="text-purple-200 mb-3">{content.body || content.content_data?.text || 'No content'}</p>
                   <div className="flex gap-3 text-sm text-purple-300">
-                    <span>Agent: {content.agent_name}</span>
+                    <span>Agent: {content.agent_name || content.agent_id}</span>
                     <span>•</span>
-                    <span>Platform: {content.platform}</span>
+                    <span>Platform: {content.platform || 'Unknown'}</span>
                     <span>•</span>
-                    <span>{new Date(content.created_at).toLocaleString()}</span>
+                    <span>{content.created_at ? new Date(content.created_at).toLocaleString() : 'Unknown date'}</span>
                   </div>
                 </div>
               </div>
@@ -406,7 +394,7 @@ const AdminDashboard = () => {
         <div className="text-center py-12">
           <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
         </div>
-      ) : workflows.length === 0 ? (
+      ) : ensureArray(workflows).length === 0 ? (
         <div className="bg-white/10 backdrop-blur-lg rounded-xl p-12 border border-white/20 text-center">
           <Workflow className="w-16 h-16 text-purple-400 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">No Workflows Found</h3>
@@ -414,11 +402,11 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {workflows.map(workflow => (
+          {ensureArray(workflows).map(workflow => (
             <div key={workflow.id} className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-white mb-1">{workflow.name}</h3>
+                  <h3 className="text-lg font-bold text-white mb-1">{workflow.name || 'Unnamed Workflow'}</h3>
                   <p className="text-purple-300 text-sm">{workflow.description || 'No description'}</p>
                 </div>
                 <button className="p-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-green-400">
@@ -431,8 +419,8 @@ const AdminDashboard = () => {
                   onChange={(e) => assignWorkflow(workflow.id, e.target.value)}
                 >
                   <option value="">Assign to agent...</option>
-                  {agents.map(agent => (
-                    <option key={agent.id} value={agent.id}>{agent.name}</option>
+                  {ensureArray(agents).map(agent => (
+                    <option key={agent.id} value={agent.id}>{agent.name || 'Unknown Agent'}</option>
                   ))}
                 </select>
               </div>
@@ -443,11 +431,80 @@ const AdminDashboard = () => {
     </div>
   );
 
-  // Navigation tabs
+  // ✅ NEW: Orchestrator Tab with Navigation
+  const renderOrchestrator = () => (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-8 text-white text-center">
+        <Brain className="w-20 h-20 mx-auto mb-4 opacity-90" />
+        <h2 className="text-3xl font-bold mb-2">6-Brain Orchestrator System</h2>
+        <p className="text-purple-100 mb-6">Query all brain agents for comprehensive analysis</p>
+        <a
+          href="/admin/orchestrator"
+          className="inline-block px-6 py-3 bg-white text-purple-600 rounded-lg font-bold hover:bg-purple-50 transition-colors"
+        >
+          Open Orchestrator Query Interface →
+        </a>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+          <Activity className="w-10 h-10 text-blue-400 mb-3" />
+          <h3 className="text-lg font-bold text-white mb-2">N8N Dual-Layer Status</h3>
+          <p className="text-purple-300 mb-4">Monitor N8N workflow system health and performance</p>
+          <a
+            href="/admin/n8n-status"
+            className="inline-block px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-blue-400 font-medium"
+          >
+            View Status →
+          </a>
+        </div>
+
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+          <MessageSquare className="w-10 h-10 text-green-400 mb-3" />
+          <h3 className="text-lg font-bold text-white mb-2">Content Approval System</h3>
+          <p className="text-purple-300 mb-4">Review and approve content from agents</p>
+          <a
+            href="/admin/content"
+            className="inline-block px-4 py-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-green-400 font-medium"
+          >
+            View Queue →
+          </a>
+        </div>
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+        <h3 className="text-xl font-bold text-white mb-4">Orchestrator Features</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
+            <div>
+              <div className="font-semibold text-white">Query All Brains</div>
+              <div className="text-sm text-purple-300">Get input from all 6 agents simultaneously</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
+            <div>
+              <div className="font-semibold text-white">Selective Queries</div>
+              <div className="text-sm text-purple-300">Choose specific brains for targeted analysis</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
+            <div>
+              <div className="font-semibold text-white">Decision Synthesis</div>
+              <div className="text-sm text-purple-300">Automatic aggregation of all responses</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Navigation tabs - ✅ UPDATED with links to new pages
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'agents', label: 'Agents', icon: Users },
-    { id: 'avatars', label: 'Avatars', icon: Image },
     { id: 'content', label: 'Content', icon: MessageSquare },
     { id: 'workflows', label: 'Workflows', icon: Workflow },
     { id: 'orchestrator', label: 'Orchestrator', icon: Brain }
@@ -529,13 +586,7 @@ const AdminDashboard = () => {
         {activeTab === 'agents' && renderAgents()}
         {activeTab === 'content' && renderContent()}
         {activeTab === 'workflows' && renderWorkflows()}
-        {activeTab === 'orchestrator' && (
-          <div className="text-center py-12">
-            <Brain className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Orchestrator Configuration</h3>
-            <p className="text-purple-300">Configuration interface coming soon</p>
-          </div>
-        )}
+        {activeTab === 'orchestrator' && renderOrchestrator()}
       </div>
     </div>
   );

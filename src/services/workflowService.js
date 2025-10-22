@@ -1,240 +1,113 @@
-import { api } from './api.js';
+// Workflow Service - Handles N8N workflow management API calls
+// Location: src/services/workflowService.js
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
 
-/**
- * Workflow Management Service
- * Complete service for managing N8N workflows integrated with agents
- */
-export const workflowService = {
+const workflowService = {
   /**
-   * List all workflows with optional filters
-   * @param {Object} filters - Filter options (assigned, agent_id)
+   * Get all N8N workflows
    */
-  async listWorkflows(filters = {}) {
-    try {
-      const params = new URLSearchParams(filters);
-      const response = await api.get(`/api/workflows?${params}`);
-      return response;
-    } catch (error) {
-      console.error('Error listing workflows:', error);
-      throw error;
-    }
+  async getWorkflows() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows`);
+    if (!response.ok) throw new Error('Failed to fetch workflows');
+    return response.json();
   },
 
   /**
-   * Get detailed workflow information
-   * @param {string} workflowId - N8N workflow ID
+   * Execute a workflow by ID
    */
-  async getWorkflow(workflowId) {
-    try {
-      const response = await api.get(`/api/workflows/${workflowId}`);
-      return response;
-    } catch (error) {
-      console.error('Error getting workflow:', error);
-      throw error;
-    }
+  async executeWorkflow(workflowId, data = {}) {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to execute workflow');
+    return response.json();
   },
 
   /**
-   * Assign workflow to an agent
-   * @param {Object} data - Assignment data
+   * Get workflow execution status
    */
-  async assignWorkflow(data) {
-    try {
-      const response = await api.post('/api/workflows/assign', data);
-      return response;
-    } catch (error) {
-      console.error('Error assigning workflow:', error);
-      throw error;
-    }
+  async getWorkflowStatus(workflowId) {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}/status`);
+    if (!response.ok) throw new Error('Failed to fetch workflow status');
+    return response.json();
   },
 
   /**
-   * Remove workflow assignment
-   * @param {number} assignmentId - Assignment ID to remove
+   * Assign workflow to agent
    */
-  async unassignWorkflow(assignmentId) {
-    try {
-      const response = await api.delete(`/api/workflows/unassign/${assignmentId}`);
-      return response;
-    } catch (error) {
-      console.error('Error unassigning workflow:', error);
-      throw error;
-    }
+  async assignWorkflow(workflowId, agentId) {
+    const response = await fetch(`${API_BASE_URL}/api/workflows/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow_id: workflowId, agent_id: agentId })
+    });
+    if (!response.ok) throw new Error('Failed to assign workflow');
+    return response.json();
   },
 
   /**
-   * Execute a workflow
-   * @param {string} workflowId - N8N workflow ID
-   * @param {Object} data - Execution data (agent_id, data)
-   */
-  async executeWorkflow(workflowId, data) {
-    try {
-      const response = await api.post(`/api/workflows/${workflowId}/execute`, data);
-      return response;
-    } catch (error) {
-      console.error('Error executing workflow:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Trigger a webhook
-   * @param {string} webhookPath - Webhook path (e.g., 'falai/generate-portrait')
-   * @param {Object} data - Webhook data
-   */
-  async triggerWebhook(webhookPath, data) {
-    try {
-      const response = await api.post(`/api/workflows/trigger/${webhookPath}`, data);
-      return response;
-    } catch (error) {
-      console.error('Error triggering webhook:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get workflow statistics
-   */
-  async getStats() {
-    try {
-      const response = await api.get('/api/workflows/stats');
-      return response;
-    } catch (error) {
-      console.error('Error getting workflow stats:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get workflows assigned to a specific agent
-   * @param {number} agentId - Agent ID
+   * Get workflows assigned to an agent
    */
   async getAgentWorkflows(agentId) {
-    try {
-      const response = await api.get(`/api/workflows/agent/${agentId}`);
-      return response;
-    } catch (error) {
-      console.error('Error getting agent workflows:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/workflows`);
+    if (!response.ok) throw new Error('Failed to fetch agent workflows');
+    return response.json();
   },
 
   /**
-   * Get execution history
-   * @param {Object} filters - Filter options (workflow_id, agent_id, status, limit)
+   * Enable/disable a workflow
    */
-  async getExecutions(filters = {}) {
-    try {
-      const params = new URLSearchParams(filters);
-      const response = await api.get(`/api/workflows/executions?${params}`);
-      return response;
-    } catch (error) {
-      console.error('Error getting executions:', error);
-      throw error;
-    }
+  async toggleWorkflow(workflowId, enabled) {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}/toggle`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    });
+    if (!response.ok) throw new Error('Failed to toggle workflow');
+    return response.json();
   },
 
   /**
-   * Health check for workflow system
+   * Get N8N health status
    */
-  async healthCheck() {
-    try {
-      const response = await api.get('/api/workflows/health');
-      return response;
-    } catch (error) {
-      console.error('Error checking workflow health:', error);
-      throw error;
-    }
-  },
-
-  // =========================================================================
-  // CONVENIENCE METHODS FOR COMMON WORKFLOWS
-  // =========================================================================
-
-  /**
-   * Generate portrait for agent (Fal.ai workflow)
-   */
-  async generatePortrait(agentId, agentName, niche, customPrompt = null) {
-    const data = {
-      agent_id: agentId,
-      agent_name: agentName,
-      niche: niche
-    };
-    
-    if (customPrompt) {
-      data.prompt = customPrompt;
-    }
-    
-    return this.triggerWebhook('falai/generate-portrait', data);
+  async getHealth() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/health`);
+    if (!response.ok) throw new Error('Failed to fetch N8N health');
+    return response.json();
   },
 
   /**
-   * Generate video for agent (Fal.ai workflow)
+   * Get unified dual-layer status
    */
-  async generateVideo(agentId, agentName, imageUrl, motionPrompt = 'natural movements', duration = 5) {
-    const data = {
-      agent_id: agentId,
-      agent_name: agentName,
-      image_url: imageUrl,
-      motion_prompt: motionPrompt,
-      duration: duration
-    };
-    
-    return this.triggerWebhook('falai/generate-video', data);
+  async getDualLayerStatus() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/unified/status`);
+    if (!response.ok) throw new Error('Failed to fetch dual-layer status');
+    return response.json();
   },
 
   /**
-   * Batch generate portraits for all agents without one
+   * Smart execute with auto-routing
    */
-  async batchGeneratePortraits() {
-    const data = {
-      generate_type: 'portraits'
-    };
-    
-    return this.triggerWebhook('falai/batch-generate', data);
+  async smartExecute(workflowId, data = {}) {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/unified/smart/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow_id: workflowId, data })
+    });
+    if (!response.ok) throw new Error('Failed to execute workflow');
+    return response.json();
   },
 
-  // Legacy methods for backwards compatibility
-  trigger: async (workflowId) => {
-    return api.post(`/api/workflows/trigger/${workflowId}`, {});
-  },
-  
-  getStatus: async (executionId) => {
-    return api.get(`/api/workflows/status/${executionId}`);
-  },
-  
-  getAll: async () => {
-    return workflowService.listWorkflows();
-  },
-
-  execute: async (workflowId, params = {}) => {
-    return workflowService.executeWorkflow(workflowId, { data: params });
-  },
-
-  toggle: async (workflowId) => {
-    return api.post(`/api/admin/workflows/${workflowId}/toggle`);
-  },
-
-  getAssignments: async () => {
-    return workflowService.listWorkflows({ assigned: 'true' });
-  },
-
-  assign: async (workflowId, agentIds) => {
-    // For multiple agents, assign one by one
-    const results = [];
-    for (const agentId of agentIds) {
-      const result = await workflowService.assignWorkflow({
-        agent_id: agentId,
-        workflow_id: workflowId,
-        workflow_name: 'Workflow', // Will be updated by backend
-        tool_type: 'general',
-        is_active: true
-      });
-      results.push(result);
-    }
-    return { success: true, results };
+  /**
+   * Get unified workflows from both layers
+   */
+  async getUnifiedWorkflows() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/unified/workflows`);
+    if (!response.ok) throw new Error('Failed to fetch unified workflows');
+    return response.json();
   }
 };
 

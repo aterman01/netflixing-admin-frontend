@@ -1,338 +1,142 @@
-// N8NDualLayerStatus.jsx - Monitor N8N Dual-Layer System
-// Shows Direct API and MCP layer status, 536 available nodes, performance metrics
+// N8N Dual Layer Status Component
+// Location: src/components/N8NDualLayerStatus.jsx
 
 import React, { useState, useEffect } from 'react';
-import { Activity, Zap, Brain, Server, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw } from 'lucide-react';
-import n8nDualLayerService from '../services/n8nDualLayerService';
+import { Activity, Zap, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import workflowService from '../services/workflowService';
 
 const N8NDualLayerStatus = () => {
   const [status, setStatus] = useState(null);
-  const [metrics, setMetrics] = useState(null);
-  const [mcpNodes, setMcpNodes] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [selectedLayer, setSelectedLayer] = useState('both'); // 'direct', 'mcp', 'both'
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    loadStatus();
-    const interval = setInterval(() => {
-      if (autoRefresh) loadStatus();
-    }, 10000); // Refresh every 10 seconds
-
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const loadStatus = async () => {
-    setLoading(true);
+  const fetchStatus = async () => {
     try {
-      const [statusData, metricsData, nodesData] = await Promise.all([
-        n8nDualLayerService.getDualLayerStatus(),
-        n8nDualLayerService.getLayerMetrics().catch(() => null),
-        n8nDualLayerService.getMcpNodes().catch(() => null)
-      ]);
-
-      setStatus(statusData);
-      setMetrics(metricsData);
-      setMcpNodes(nodesData);
+      setLoading(true);
+      const data = await workflowService.getDualLayerStatus();
+      setStatus(data);
+      setLastUpdated(new Date());
     } catch (error) {
-      console.error('Failed to load status:', error);
+      console.error('Failed to fetch dual-layer status:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (healthy) => {
-    return healthy ? 'text-green-400' : 'text-red-400';
-  };
+  useEffect(() => {
+    fetchStatus();
+  }, []);
 
-  const getStatusBg = (healthy) => {
-    return healthy ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30';
-  };
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchStatus, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
+  if (loading && !status) {
+    return (
+      <div className="bg-gray-800 rounded-lg p-6">
+        <div className="flex items-center justify-center">
+          <RefreshCw className="animate-spin mr-2" />
+          <span>Loading N8N status...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-cyan-900/50 to-blue-900/50 rounded-xl p-6 border border-cyan-500/30">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Activity className="w-8 h-8 text-cyan-400" />
-              <h2 className="text-2xl font-bold text-white">N8N Dual-Layer System</h2>
-            </div>
-            <p className="text-cyan-200">
-              Monitor Direct API and MCP layer performance
-            </p>
-          </div>
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm ${
-                autoRefresh 
-                  ? 'bg-green-600/20 text-green-300' 
-                  : 'bg-gray-600/20 text-gray-400'
-              }`}
-            >
-              {autoRefresh ? 'Auto-Refresh On' : 'Auto-Refresh Off'}
-            </button>
-            <button
-              onClick={loadStatus}
-              disabled={loading}
-              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Activity className="text-blue-400" />
+          N8N Dual-Layer Status
+        </h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`px-4 py-2 rounded-lg ${
+              autoRefresh ? 'bg-green-600' : 'bg-gray-600'
+            } text-white`}
+          >
+            Auto-refresh: {autoRefresh ? 'ON' : 'OFF'}
+          </button>
+          <button
+            onClick={fetchStatus}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2"
+          >
+            <RefreshCw className={loading ? 'animate-spin' : ''} size={16} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Layer Selection */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setSelectedLayer('both')}
-          className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
-            selectedLayer === 'both'
-              ? 'bg-cyan-600 text-white'
-              : 'bg-gray-700/30 text-gray-400 hover:bg-gray-700/50'
-          }`}
-        >
-          Both Layers
-        </button>
-        <button
-          onClick={() => setSelectedLayer('direct')}
-          className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
-            selectedLayer === 'direct'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700/30 text-gray-400 hover:bg-gray-700/50'
-          }`}
-        >
-          Direct API
-        </button>
-        <button
-          onClick={() => setSelectedLayer('mcp')}
-          className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
-            selectedLayer === 'mcp'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-700/30 text-gray-400 hover:bg-gray-700/50'
-          }`}
-        >
-          MCP Layer
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Direct API Status */}
-        {(selectedLayer === 'both' || selectedLayer === 'direct') && (
-          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50 space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <Zap className="w-6 h-6 text-blue-400" />
-              <h3 className="text-xl font-bold text-white">Direct API Layer</h3>
-            </div>
-
-            {status?.direct_api ? (
-              <>
-                {/* Status Indicator */}
-                <div className={`rounded-lg border p-4 ${getStatusBg(status.direct_api.healthy)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-white">Status</span>
-                    {status.direct_api.healthy ? (
-                      <CheckCircle className={getStatusColor(true)} />
-                    ) : (
-                      <XCircle className={getStatusColor(false)} />
-                    )}
-                  </div>
-                  <div className={`text-sm ${getStatusColor(status.direct_api.healthy)}`}>
-                    {status.direct_api.healthy ? 'Operational' : 'Degraded'}
-                  </div>
-                </div>
-
-                {/* Metrics */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
-                    <span className="text-gray-300 text-sm">Response Time</span>
-                    <span className="text-white font-semibold">
-                      {status.direct_api.response_time || 'N/A'}ms
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
-                    <span className="text-gray-300 text-sm">Active Workflows</span>
-                    <span className="text-white font-semibold">
-                      {status.direct_api.active_workflows || 0}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
-                    <span className="text-gray-300 text-sm">Executions Today</span>
-                    <span className="text-white font-semibold">
-                      {status.direct_api.executions_today || 0}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Features */}
-                <div>
-                  <h4 className="text-white font-semibold mb-2 text-sm">Features</h4>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs">
-                      ⚡ Fast Execution
-                    </span>
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs">
-                      🎯 Simple Workflows
-                    </span>
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs">
-                      📊 Basic Analytics
-                    </span>
-                  </div>
-                </div>
-              </>
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Direct API Layer */}
+        <div className="bg-gray-800 rounded-lg p-6 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-white">Direct API Layer</h3>
+            {status?.layers?.direct?.healthy ? (
+              <CheckCircle className="text-green-500" size={24} />
             ) : (
-              <div className="text-gray-400 text-center py-8">
-                Loading Direct API status...
-              </div>
+              <XCircle className="text-red-500" size={24} />
             )}
           </div>
-        )}
-
-        {/* MCP Layer Status */}
-        {(selectedLayer === 'both' || selectedLayer === 'mcp') && (
-          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50 space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <Brain className="w-6 h-6 text-purple-400" />
-              <h3 className="text-xl font-bold text-white">MCP Layer</h3>
-            </div>
-
-            {status?.mcp ? (
-              <>
-                {/* Status Indicator */}
-                <div className={`rounded-lg border p-4 ${getStatusBg(status.mcp.healthy)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-white">Status</span>
-                    {status.mcp.healthy ? (
-                      <CheckCircle className={getStatusColor(true)} />
-                    ) : (
-                      <XCircle className={getStatusColor(false)} />
-                    )}
-                  </div>
-                  <div className={`text-sm ${getStatusColor(status.mcp.healthy)}`}>
-                    {status.mcp.healthy ? 'Operational' : 'Degraded'}
-                  </div>
-                </div>
-
-                {/* Capabilities */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                    <span className="text-purple-200 text-sm">Available Nodes</span>
-                    <span className="text-white font-bold text-lg">
-                      {mcpNodes?.total || 536}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                    <span className="text-purple-200 text-sm">Templates</span>
-                    <span className="text-white font-bold text-lg">
-                      2,500+
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
-                    <span className="text-gray-300 text-sm">MCP Executions</span>
-                    <span className="text-white font-semibold">
-                      {status.mcp.executions_today || 0}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Advanced Features */}
-                <div>
-                  <h4 className="text-white font-semibold mb-2 text-sm">Advanced Features</h4>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
-                      🧠 Complex Workflows
-                    </span>
-                    <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
-                      🔧 Advanced Nodes
-                    </span>
-                    <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
-                      📚 Templates
-                    </span>
-                    <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
-                      ⚡ AI Integration
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-gray-400 text-center py-8">
-                Loading MCP status...
-              </div>
+          <div className="space-y-2 text-gray-300">
+            <p><strong>Status:</strong> {status?.layers?.direct?.healthy ? 'Healthy' : 'Offline'}</p>
+            <p><strong>Workflows:</strong> {status?.layers?.direct?.workflows?.length || 0}</p>
+            <p><strong>URL:</strong> <span className="text-xs">{status?.layers?.direct?.url}</span></p>
+            {status?.layers?.direct?.response_time && (
+              <p><strong>Response Time:</strong> {status.layers.direct.response_time}ms</p>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* Performance Metrics */}
-      {metrics && (
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-          <div className="flex items-center gap-3 mb-4">
-            <TrendingUp className="w-6 h-6 text-green-400" />
-            <h3 className="text-xl font-bold text-white">Performance Metrics</h3>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-700/30 rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Avg Response Time</div>
-              <div className="text-white text-2xl font-bold">
-                {metrics.avg_response_time || 'N/A'}ms
-              </div>
-            </div>
-            <div className="bg-gray-700/30 rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Success Rate</div>
-              <div className="text-green-400 text-2xl font-bold">
-                {metrics.success_rate || 'N/A'}%
-              </div>
-            </div>
-            <div className="bg-gray-700/30 rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Total Executions</div>
-              <div className="text-white text-2xl font-bold">
-                {metrics.total_executions || 0}
-              </div>
-            </div>
-            <div className="bg-gray-700/30 rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Active Now</div>
-              <div className="text-cyan-400 text-2xl font-bold">
-                {metrics.active_now || 0}
-              </div>
-            </div>
           </div>
         </div>
-      )}
+
+        {/* MCP Layer */}
+        <div className="bg-gray-800 rounded-lg p-6 border-l-4 border-purple-500">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-white">MCP Layer</h3>
+            {status?.layers?.mcp?.available ? (
+              <CheckCircle className="text-green-500" size={24} />
+            ) : (
+              <XCircle className="text-yellow-500" size={24} />
+            )}
+          </div>
+          <div className="space-y-2 text-gray-300">
+            <p><strong>Status:</strong> {status?.layers?.mcp?.available ? 'Available' : 'Not Configured'}</p>
+            <p><strong>Nodes Available:</strong> 536</p>
+            <p><strong>Templates:</strong> 2500+</p>
+            {status?.layers?.mcp?.response_time && (
+              <p><strong>Response Time:</strong> {status.layers.mcp.response_time}ms</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Smart Routing Info */}
-      <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 rounded-xl p-6 border border-green-500/30">
-        <div className="flex items-center gap-3 mb-3">
-          <Server className="w-6 h-6 text-green-400" />
-          <h3 className="text-lg font-bold text-white">Smart Routing System</h3>
-        </div>
-        <p className="text-gray-300 text-sm mb-3">
-          The dual-layer system automatically routes workflows to the optimal layer:
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-            <div className="text-blue-300 font-semibold mb-1 text-sm">Direct API</div>
-            <div className="text-gray-400 text-xs">
-              ✓ Simple workflows<br/>
-              ✓ Fast execution needed<br/>
-              ✓ Basic operations
-            </div>
-          </div>
-          <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-            <div className="text-purple-300 font-semibold mb-1 text-sm">MCP Layer</div>
-            <div className="text-gray-400 text-xs">
-              ✓ Complex workflows<br/>
-              ✓ Advanced features<br/>
-              ✓ AI integration
-            </div>
-          </div>
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <Zap className="text-yellow-400" />
+          Smart Routing
+        </h3>
+        <div className="space-y-2 text-gray-300">
+          <p><strong>Active Layer:</strong> {status?.routing?.preferred_layer || 'Direct API'}</p>
+          <p><strong>Routing Logic:</strong> {status?.routing?.strategy || 'Automatic selection based on task complexity'}</p>
+          <p className="text-sm text-gray-400 mt-4">
+            The system automatically chooses the best layer for each workflow execution. 
+            Direct API is used for standard workflows, while MCP layer provides access to 536 nodes and 2500+ templates.
+          </p>
         </div>
       </div>
+
+      {/* Last Updated */}
+      {lastUpdated && (
+        <div className="text-center text-gray-400 text-sm">
+          Last updated: {lastUpdated.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 };
