@@ -1,73 +1,189 @@
-// Content Service - Handles content approval/rejection API calls
+// Content Management Service
 // Location: src/services/contentService.js
+// Handles all content queue operations including approval/rejection
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
+import api from './api';
 
 const contentService = {
   /**
-   * Get content moderation queue
+   * Get all pending content in the queue
+   * @returns {Promise<Array>} Array of content items
    */
   async getQueue() {
-    const response = await fetch(`${API_BASE_URL}/api/admin/content/queue`);
-    if (!response.ok) throw new Error('Failed to fetch content queue');
-    return response.json();
+    try {
+      const response = await api.get('/api/admin/content/queue');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch content queue:', error);
+      throw error;
+    }
   },
 
   /**
-   * Approve content by ID
+   * Get queue with filtering
+   * @param {Object} params - Filter parameters
+   * @param {string} params.status - Filter by status (pending/approved/rejected)
+   * @param {number} params.agent_id - Filter by agent ID
+   * @param {string} params.platform - Filter by platform
+   * @returns {Promise<Array>} Filtered content items
+   */
+  async getQueueFiltered(params = {}) {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const response = await api.get(`/api/admin/content/queue?${queryString}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch filtered queue:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Approve a content item
+   * @param {string} contentId - Content ID to approve
+   * @param {string} feedback - Optional feedback message
+   * @returns {Promise<Object>} Approval result
    */
   async approveContent(contentId, feedback = '') {
-    const response = await fetch(`${API_BASE_URL}/api/admin/content/${contentId}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedback })
-    });
-    if (!response.ok) throw new Error('Failed to approve content');
-    return response.json();
+    try {
+      const response = await api.post(`/api/admin/content/${contentId}/approve`, {
+        feedback,
+        approved_at: new Date().toISOString()
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to approve content ${contentId}:`, error);
+      throw error;
+    }
   },
 
   /**
-   * Reject content by ID
+   * Reject a content item
+   * @param {string} contentId - Content ID to reject
+   * @param {string} reason - Rejection reason (required)
+   * @returns {Promise<Object>} Rejection result
    */
   async rejectContent(contentId, reason) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/content/${contentId}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason })
-    });
-    if (!response.ok) throw new Error('Failed to reject content');
-    return response.json();
+    if (!reason || reason.trim() === '') {
+      throw new Error('Rejection reason is required');
+    }
+
+    try {
+      const response = await api.post(`/api/admin/content/${contentId}/reject`, {
+        reason,
+        rejected_at: new Date().toISOString()
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to reject content ${contentId}:`, error);
+      throw error;
+    }
   },
 
   /**
-   * Edit content before approval
+   * Edit/Update a content item before approval
+   * @param {string} contentId - Content ID to edit
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} Update result
    */
   async editContent(contentId, updates) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/content/${contentId}/edit`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
-    });
-    if (!response.ok) throw new Error('Failed to edit content');
-    return response.json();
+    try {
+      const response = await api.put(`/api/admin/content/${contentId}/edit`, updates);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to edit content ${contentId}:`, error);
+      throw error;
+    }
   },
 
   /**
-   * Get content approval history
+   * Schedule content for future posting
+   * @param {string} contentId - Content ID to schedule
+   * @param {string} scheduledTime - ISO timestamp for scheduled posting
+   * @returns {Promise<Object>} Schedule result
    */
-  async getHistory(limit = 50) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/content/history?limit=${limit}`);
-    if (!response.ok) throw new Error('Failed to fetch content history');
-    return response.json();
+  async scheduleContent(contentId, scheduledTime) {
+    try {
+      const response = await api.post(`/api/admin/content/${contentId}/schedule`, {
+        scheduled_time: scheduledTime
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to schedule content ${contentId}:`, error);
+      throw error;
+    }
   },
 
   /**
-   * Get content by ID
+   * Get content moderation history
+   * @param {Object} params - Query parameters
+   * @returns {Promise<Array>} Content history
    */
-  async getContentById(contentId) {
-    const response = await fetch(`${API_BASE_URL}/api/admin/content/${contentId}`);
-    if (!response.ok) throw new Error('Failed to fetch content');
-    return response.json();
+  async getHistory(params = {}) {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const response = await api.get(`/api/admin/content/history?${queryString}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch content history:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get content statistics
+   * @returns {Promise<Object>} Content stats (total, pending, approved, rejected)
+   */
+  async getStats() {
+    try {
+      const response = await api.get('/api/admin/content/stats');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch content stats:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Batch approve multiple content items
+   * @param {Array<string>} contentIds - Array of content IDs
+   * @param {string} feedback - Optional feedback for all items
+   * @returns {Promise<Object>} Batch approval results
+   */
+  async batchApprove(contentIds, feedback = '') {
+    try {
+      const response = await api.post('/api/admin/content/batch/approve', {
+        content_ids: contentIds,
+        feedback
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to batch approve content:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Batch reject multiple content items
+   * @param {Array<string>} contentIds - Array of content IDs
+   * @param {string} reason - Rejection reason for all items
+   * @returns {Promise<Object>} Batch rejection results
+   */
+  async batchReject(contentIds, reason) {
+    if (!reason || reason.trim() === '') {
+      throw new Error('Rejection reason is required');
+    }
+
+    try {
+      const response = await api.post('/api/admin/content/batch/reject', {
+        content_ids: contentIds,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to batch reject content:', error);
+      throw error;
+    }
   }
 };
 
