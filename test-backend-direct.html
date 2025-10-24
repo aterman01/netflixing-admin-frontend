@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>N8N Backend Direct Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        h1 { color: #ffff00; }
+        h2 { color: #00ffff; }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #00cc00; }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        pre {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            padding: 15px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #00ffff; }
+        .warning { color: #ffff00; }
+    </style>
+</head>
+<body>
+    <h1>🔍 N8N BACKEND DIRECT TEST</h1>
+    <p class="info">This page directly calls the backend API to see exactly what data is being returned.</p>
+
+    <div class="section">
+        <h2>Test Controls</h2>
+        <button onclick="testHealth()">1. Test Health</button>
+        <button onclick="testWorkflows()">2. Get Workflows</button>
+        <button onclick="testBoth()">3. Run Both Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div class="section" id="results">
+        <h2>Results:</h2>
+        <p>Click a test button above...</p>
+    </div>
+
+    <script>
+        const API_URL = 'https://netflixing-admin-backend-production.up.railway.app';
+        const resultsDiv = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const colors = {
+                success: '#00ff00',
+                error: '#ff0000',
+                info: '#00ffff',
+                warning: '#ffff00'
+            };
+            const span = document.createElement('div');
+            span.style.color = colors[type];
+            span.textContent = message;
+            resultsDiv.appendChild(span);
+        }
+
+        function logJSON(label, data) {
+            log(`\n${label}:`, 'warning');
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(data, null, 2);
+            resultsDiv.appendChild(pre);
+        }
+
+        function clearResults() {
+            resultsDiv.innerHTML = '<h2>Results:</h2>';
+        }
+
+        async function testHealth() {
+            clearResults();
+            log('============================', 'warning');
+            log('TEST 1: N8N HEALTH CHECK', 'warning');
+            log('============================', 'warning');
+            log(`URL: ${API_URL}/api/n8n/health`, 'info');
+            
+            try {
+                const response = await fetch(`${API_URL}/api/n8n/health`);
+                log(`Response Status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                logJSON('Response Data', data);
+                
+                if (data.status === 'connected') {
+                    log('✓ N8N is CONNECTED!', 'success');
+                } else {
+                    log('✗ N8N is NOT connected', 'error');
+                }
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+                logJSON('Error Details', error);
+            }
+        }
+
+        async function testWorkflows() {
+            clearResults();
+            log('============================', 'warning');
+            log('TEST 2: GET WORKFLOWS', 'warning');
+            log('============================', 'warning');
+            log(`URL: ${API_URL}/api/n8n/workflows`, 'info');
+            
+            try {
+                const response = await fetch(`${API_URL}/api/n8n/workflows`);
+                log(`Response Status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                logJSON('Response Data', data);
+                
+                log('\n=== DATA ANALYSIS ===', 'warning');
+                log(`typeof data: ${typeof data}`, 'info');
+                log(`data is object: ${typeof data === 'object'}`, 'info');
+                log(`data.total: ${data.total}`, 'info');
+                log(`data.workflows exists: ${!!data.workflows}`, 'info');
+                log(`data.workflows is Array: ${Array.isArray(data.workflows)}`, 'info');
+                log(`data.workflows.length: ${data.workflows?.length || 'undefined'}`, 'info');
+                
+                if (data.workflows && data.workflows.length > 0) {
+                    log(`\n✓ Found ${data.workflows.length} workflow(s)!`, 'success');
+                    logJSON('First Workflow', data.workflows[0]);
+                    
+                    log('\n=== FIRST WORKFLOW FIELDS ===', 'warning');
+                    const workflow = data.workflows[0];
+                    log(`id: ${workflow.id}`, 'info');
+                    log(`name: ${workflow.name}`, 'info');
+                    log(`active: ${workflow.active}`, 'info');
+                    log(`createdAt: ${workflow.createdAt}`, 'info');
+                    log(`updatedAt: ${workflow.updatedAt}`, 'info');
+                    log(`tags: ${JSON.stringify(workflow.tags)}`, 'info');
+                } else {
+                    log('✗ No workflows found in response', 'error');
+                }
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+                logJSON('Error Details', error);
+            }
+        }
+
+        async function testBoth() {
+            await testHealth();
+            log('\n\n', 'info');
+            await testWorkflows();
+        }
+
+        // Auto-run on page load
+        window.onload = () => {
+            log('Page loaded. Click "Run Both Tests" to start!', 'warning');
+        };
+    </script>
+</body>
+</html>

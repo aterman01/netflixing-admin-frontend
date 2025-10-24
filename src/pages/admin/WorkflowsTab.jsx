@@ -3,9 +3,8 @@ import workflowService from '../../services/workflowService';
 import { RefreshCw, Zap, AlertCircle, CheckCircle, PlayCircle, Server } from 'lucide-react';
 
 /**
- * Workflows Tab - Simplified Version
- * Shows N8N workflows and allows execution
- * Only uses endpoints that actually exist in the backend
+ * Workflows Tab - ON-SCREEN DEBUG VERSION
+ * Shows ALL data on screen so we can see exactly what's happening
  */
 const WorkflowsTab = () => {
   const [workflows, setWorkflows] = useState([]);
@@ -13,6 +12,7 @@ const WorkflowsTab = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [executing, setExecuting] = useState({});
+  const [debugInfo, setDebugInfo] = useState({});
 
   useEffect(() => {
     loadData();
@@ -23,31 +23,32 @@ const WorkflowsTab = () => {
       setLoading(true);
       setError(null);
       
-      console.log('===== N8N WORKFLOW DEBUG START =====');
+      const debug = {};
       
       // Load health status
       const healthData = await workflowService.getHealth();
-      console.log('1. Health data received:', healthData);
+      debug.health = healthData;
       setHealth(healthData);
       
       // Load workflows
       const workflowData = await workflowService.getWorkflows();
-      console.log('2. Workflow data received:', workflowData);
-      console.log('3. Workflows array:', workflowData.workflows);
-      console.log('4. Workflows array length:', workflowData.workflows?.length);
-      console.log('5. Array type check:', Array.isArray(workflowData.workflows));
+      debug.rawResponse = workflowData;
+      debug.workflowsArray = workflowData.workflows;
+      debug.workflowsLength = workflowData.workflows?.length;
+      debug.isArray = Array.isArray(workflowData.workflows);
       
       const workflowsToSet = workflowData.workflows || [];
-      console.log('6. Workflows to set in state:', workflowsToSet);
-      console.log('7. Workflows to set length:', workflowsToSet.length);
+      debug.workflowsToSet = workflowsToSet;
+      debug.workflowsToSetLength = workflowsToSet.length;
       
       setWorkflows(workflowsToSet);
+      setDebugInfo(debug);
       
-      console.log('8. State update called');
-      console.log('===== N8N WORKFLOW DEBUG END =====');
+      console.log('===== DEBUG INFO =====', debug);
     } catch (err) {
       console.error('Error loading workflows:', err);
       setError(err.message || 'Failed to load N8N workflows');
+      setDebugInfo({ error: err.message, stack: err.stack });
     } finally {
       setLoading(false);
     }
@@ -56,11 +57,10 @@ const WorkflowsTab = () => {
   const handleExecuteWorkflow = async (workflow) => {
     const workflowId = workflow.id;
     
-    // Prompt for execution parameters
     const agentName = prompt('Enter agent name (optional):');
     const topic = prompt('Enter topic (optional):');
     
-    if (agentName === null) return; // User cancelled
+    if (agentName === null) return;
     
     setExecuting(prev => ({ ...prev, [workflowId]: true }));
     
@@ -87,6 +87,41 @@ const WorkflowsTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* DEBUG PANEL - ON SCREEN */}
+      <div className="bg-black/50 border border-yellow-500 rounded-xl p-6">
+        <h2 className="text-yellow-400 text-2xl font-bold mb-4">🔍 LIVE DEBUG INFO</h2>
+        <div className="space-y-2 text-sm font-mono text-white">
+          <div className="border-b border-yellow-500/30 pb-2 mb-2">
+            <div className="text-yellow-400 font-bold">STATE VALUES:</div>
+            <div>loading: {String(loading)}</div>
+            <div>workflows.length: {workflows.length}</div>
+            <div>workflows is Array: {String(Array.isArray(workflows))}</div>
+            <div>error: {error || 'null'}</div>
+          </div>
+          
+          <div className="border-b border-yellow-500/30 pb-2 mb-2">
+            <div className="text-yellow-400 font-bold">DEBUG INFO OBJECT:</div>
+            <pre className="text-xs text-green-400 overflow-auto max-h-60 bg-black/50 p-2 rounded">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          </div>
+          
+          <div className="border-b border-yellow-500/30 pb-2 mb-2">
+            <div className="text-yellow-400 font-bold">WORKFLOWS ARRAY:</div>
+            <pre className="text-xs text-blue-400 overflow-auto max-h-60 bg-black/50 p-2 rounded">
+              {JSON.stringify(workflows, null, 2)}
+            </pre>
+          </div>
+          
+          <div className="border-b border-yellow-500/30 pb-2 mb-2">
+            <div className="text-yellow-400 font-bold">RENDER LOGIC CHECK:</div>
+            <div>Will show loading: {String(loading)}</div>
+            <div>Will show empty: {String(!loading && workflows.length === 0)}</div>
+            <div>Will show cards: {String(!loading && workflows.length > 0)}</div>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -167,16 +202,6 @@ const WorkflowsTab = () => {
       </div>
 
       {/* Workflows Grid */}
-      {(() => {
-        console.log('RENDER CHECK:', {
-          loading,
-          workflowsLength: workflows.length,
-          workflows: workflows,
-          isArray: Array.isArray(workflows),
-          showEmpty: workflows.length === 0
-        });
-        return null;
-      })()}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>

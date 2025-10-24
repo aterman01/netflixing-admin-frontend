@@ -23,6 +23,8 @@ const AdminDashboard = () => {
   const [contentQueue, setContentQueue] = useState([]); // ✅ FIXED: Initialize as empty array
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedAgents, setSelectedAgents] = useState({}); // ✅ NEW: Track selected agent per workflow
+  const [executingWorkflows, setExecutingWorkflows] = useState({}); // ✅ NEW: Track executing workflows
 
   // Backend API URL
   const API_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
@@ -129,18 +131,49 @@ const AdminDashboard = () => {
     }
   };
 
-  const assignWorkflow = async (workflowId, agentId) => {
+  // ✅ FIXED: Execute workflow with selected agent
+  const executeWorkflow = async (workflowId) => {
+    const agentId = selectedAgents[workflowId];
+    
+    if (!agentId) {
+      setError('Please select an agent first');
+      return;
+    }
+
+    const agent = ensureArray(agents).find(a => a.id === agentId);
+    if (!agent) {
+      setError('Selected agent not found');
+      return;
+    }
+
+    setExecutingWorkflows(prev => ({ ...prev, [workflowId]: true }));
+    
     try {
-      const res = await fetch(`${API_URL}/api/workflows/assign`, {
+      const res = await fetch(`${API_URL}/api/n8n/workflows/${workflowId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflow_id: workflowId, agent_id: agentId })
+        body: JSON.stringify({
+          agent_name: agent.name,
+          agent_id: agent.id
+        })
       });
+
       if (res.ok) {
-        alert('Workflow assigned successfully!');
+        const result = await res.json();
+        alert(
+          `✅ Workflow Executed!\n\n` +
+          `Agent: ${agent.name}\n` +
+          `Workflow ID: ${workflowId}\n` +
+          `Execution ID: ${result.execution_id || 'N/A'}\n` +
+          `Status: ${result.success ? 'Success' : 'Pending'}`
+        );
+      } else {
+        throw new Error('Workflow execution failed');
       }
     } catch (err) {
-      setError('Failed to assign workflow');
+      setError(`Failed to execute workflow: ${err.message}`);
+    } finally {
+      setExecutingWorkflows(prev => ({ ...prev, [workflowId]: false }));
     }
   };
 
@@ -377,6 +410,7 @@ const AdminDashboard = () => {
     </div>
   );
 
+  // ✅ COMPLETELY FIXED: Workflows with proper execution and visible dropdown
   const renderWorkflows = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -405,22 +439,50 @@ const AdminDashboard = () => {
           {ensureArray(workflows).map(workflow => (
             <div key={workflow.id} className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
               <div className="flex items-start justify-between mb-4">
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-bold text-white mb-1">{workflow.name || 'Unnamed Workflow'}</h3>
                   <p className="text-purple-300 text-sm">{workflow.description || 'No description'}</p>
                 </div>
-                <button className="p-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-green-400">
-                  <Play className="w-4 h-4" />
+                {/* ✅ FIXED: Play button now executes workflow */}
+                <button 
+                  onClick={() => executeWorkflow(workflow.id)}
+                  disabled={!selectedAgents[workflow.id] || executingWorkflows[workflow.id]}
+                  className={`p-2 rounded-lg transition-colors ${
+                    selectedAgents[workflow.id] && !executingWorkflows[workflow.id]
+                      ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                      : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                  }`}
+                  title={!selectedAgents[workflow.id] ? 'Select an agent first' : 'Execute workflow'}
+                >
+                  {executingWorkflows[workflow.id] ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
                 </button>
               </div>
+              {/* ✅ FIXED: Dropdown now has proper contrast - black background, white text */}
               <div className="flex gap-2">
                 <select 
-                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm"
-                  onChange={(e) => assignWorkflow(workflow.id, e.target.value)}
+                  value={selectedAgents[workflow.id] || ''}
+                  onChange={(e) => setSelectedAgents(prev => ({ ...prev, [workflow.id]: e.target.value }))}
+                  className="flex-1 bg-gray-900 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  style={{
+                    backgroundColor: '#1a1a1a',
+                    color: '#ffffff'
+                  }}
                 >
-                  <option value="">Assign to agent...</option>
+                  <option value="" style={{ backgroundColor: '#1a1a1a', color: '#9ca3af' }}>
+                    Assign to agent...
+                  </option>
                   {ensureArray(agents).map(agent => (
-                    <option key={agent.id} value={agent.id}>{agent.name || 'Unknown Agent'}</option>
+                    <option 
+                      key={agent.id} 
+                      value={agent.id}
+                      style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+                    >
+                      {agent.name || 'Unknown Agent'}
+                    </option>
                   ))}
                 </select>
               </div>
