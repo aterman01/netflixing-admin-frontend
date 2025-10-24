@@ -1,11 +1,39 @@
-// Workflow Service - Handles N8N workflow management API calls
-// Location: src/services/workflowService.js
+/**
+ * N8N Workflow Service
+ * 
+ * Simplified service that ONLY uses endpoints that actually exist in the backend.
+ * All endpoints verified to match routes_n8n.py
+ * 
+ * Location: src/services/workflowService.js
+ */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://netflixing-admin-backend-production.up.railway.app';
 
 const workflowService = {
   /**
+   * Get N8N connection health
+   * Backend: GET /api/n8n/health
+   */
+  async getHealth() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/health`);
+    if (!response.ok) throw new Error('Failed to fetch N8N health');
+    return response.json();
+  },
+
+  /**
+   * Get N8N integration status and available endpoints
+   * Backend: GET /api/n8n/status
+   */
+  async getStatus() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/status`);
+    if (!response.ok) throw new Error('Failed to fetch N8N status');
+    return response.json();
+  },
+
+  /**
    * Get all N8N workflows
+   * Backend: GET /api/n8n/workflows
+   * Returns: { total: number, workflows: Array }
    */
   async getWorkflows() {
     const response = await fetch(`${API_BASE_URL}/api/n8n/workflows`);
@@ -14,7 +42,26 @@ const workflowService = {
   },
 
   /**
+   * Get specific workflow details
+   * Backend: GET /api/n8n/workflows/<id>
+   */
+  async getWorkflowDetails(workflowId) {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}`);
+    if (!response.ok) throw new Error('Failed to fetch workflow details');
+    return response.json();
+  },
+
+  /**
    * Execute a workflow by ID
+   * Backend: POST /api/n8n/workflows/<id>/execute
+   * 
+   * Example payload:
+   * {
+   *   agent_name: "Ava Chen",
+   *   topic: "AI Safety Breakthroughs",
+   *   platform: "TikTok",
+   *   duration: 30
+   * }
    */
   async executeWorkflow(workflowId, data = {}) {
     const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}/execute`, {
@@ -27,86 +74,37 @@ const workflowService = {
   },
 
   /**
-   * Get workflow execution status
+   * Trigger content creation workflow
+   * Backend: POST /api/n8n/content/create
+   * 
+   * Payload:
+   * {
+   *   agent_name: "Ava Chen",
+   *   topic: "AI Safety",
+   *   platform: "TikTok",
+   *   duration: 30
+   * }
    */
-  async getWorkflowStatus(workflowId) {
-    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}/status`);
-    if (!response.ok) throw new Error('Failed to fetch workflow status');
-    return response.json();
-  },
-
-  /**
-   * Assign workflow to agent
-   */
-  async assignWorkflow(workflowId, agentId) {
-    const response = await fetch(`${API_BASE_URL}/api/workflows/assign`, {
+  async createContent(data) {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/content/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workflow_id: workflowId, agent_id: agentId })
+      body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Failed to assign workflow');
+    if (!response.ok) throw new Error('Failed to create content');
     return response.json();
   },
 
   /**
-   * Get workflows assigned to an agent
+   * Test N8N integration
+   * Backend: GET or POST /api/n8n/test
    */
-  async getAgentWorkflows(agentId) {
-    const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/workflows`);
-    if (!response.ok) throw new Error('Failed to fetch agent workflows');
-    return response.json();
-  },
-
-  /**
-   * Enable/disable a workflow
-   */
-  async toggleWorkflow(workflowId, enabled) {
-    const response = await fetch(`${API_BASE_URL}/api/n8n/workflows/${workflowId}/toggle`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled })
-    });
-    if (!response.ok) throw new Error('Failed to toggle workflow');
-    return response.json();
-  },
-
-  /**
-   * Get N8N health status
-   */
-  async getHealth() {
-    const response = await fetch(`${API_BASE_URL}/api/n8n/health`);
-    if (!response.ok) throw new Error('Failed to fetch N8N health');
-    return response.json();
-  },
-
-  /**
-   * Get unified dual-layer status
-   */
-  async getDualLayerStatus() {
-    const response = await fetch(`${API_BASE_URL}/api/n8n/unified/status`);
-    if (!response.ok) throw new Error('Failed to fetch dual-layer status');
-    return response.json();
-  },
-
-  /**
-   * Smart execute with auto-routing
-   */
-  async smartExecute(workflowId, data = {}) {
-    const response = await fetch(`${API_BASE_URL}/api/n8n/unified/smart/execute`, {
+  async testIntegration() {
+    const response = await fetch(`${API_BASE_URL}/api/n8n/test`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workflow_id: workflowId, data })
+      headers: { 'Content-Type': 'application/json' }
     });
-    if (!response.ok) throw new Error('Failed to execute workflow');
-    return response.json();
-  },
-
-  /**
-   * Get unified workflows from both layers
-   */
-  async getUnifiedWorkflows() {
-    const response = await fetch(`${API_BASE_URL}/api/n8n/unified/workflows`);
-    if (!response.ok) throw new Error('Failed to fetch unified workflows');
+    if (!response.ok) throw new Error('Failed to test N8N integration');
     return response.json();
   }
 };

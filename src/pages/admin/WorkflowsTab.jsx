@@ -1,92 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import workflowService from '../../services/workflowService';
-import WorkflowCard from '../../components/workflows/WorkflowCard';
-import AssignmentModal from '../../components/workflows/AssignmentModal';
-import ExecutionModal from '../../components/workflows/ExecutionModal';
-import { RefreshCw, Filter, Zap, Activity } from 'lucide-react';
+import { RefreshCw, Zap, AlertCircle, CheckCircle, PlayCircle, Server } from 'lucide-react';
 
 /**
- * Workflows Tab
- * Complete workflow management interface with assignment, execution, and monitoring
+ * Workflows Tab - Simplified Version
+ * Shows N8N workflows and allows execution
+ * Only uses endpoints that actually exist in the backend
  */
 const WorkflowsTab = () => {
   const [workflows, setWorkflows] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all'); // all, assigned, unassigned
-  const [selectedWorkflow, setSelectedWorkflow] = useState(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showExecutionModal, setShowExecutionModal] = useState(false);
+  const [executing, setExecuting] = useState({});
 
   useEffect(() => {
-    loadWorkflows();
-    loadStats();
-  }, [filter]);
+    loadData();
+  }, []);
 
-  const loadWorkflows = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const filters = {};
-      if (filter === 'assigned') filters.assigned = 'true';
-      if (filter === 'unassigned') filters.assigned = 'false';
+      // Load health status
+      const healthData = await workflowService.getHealth();
+      setHealth(healthData);
       
-      const data = await workflowService.listWorkflows(filters);
-      setWorkflows(data.workflows || []);
+      // Load workflows
+      const workflowData = await workflowService.getWorkflows();
+      setWorkflows(workflowData.workflows || []);
     } catch (err) {
       console.error('Error loading workflows:', err);
-      setError('Failed to load workflows. Please try again.');
+      setError(err.message || 'Failed to load N8N workflows');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadStats = async () => {
+  const handleExecuteWorkflow = async (workflow) => {
+    const workflowId = workflow.id;
+    
+    // Prompt for execution parameters
+    const agentName = prompt('Enter agent name (optional):');
+    const topic = prompt('Enter topic (optional):');
+    
+    if (agentName === null) return; // User cancelled
+    
+    setExecuting(prev => ({ ...prev, [workflowId]: true }));
+    
     try {
-      const data = await workflowService.getStats();
-      setStats(data);
+      const data = {};
+      if (agentName) data.agent_name = agentName;
+      if (topic) data.topic = topic;
+      
+      const result = await workflowService.executeWorkflow(workflowId, data);
+      
+      alert(
+        `✅ Workflow Executed Successfully!\n\n` +
+        `Workflow: ${workflow.name}\n` +
+        `Execution ID: ${result.execution_id || 'N/A'}\n` +
+        `Status: ${result.success ? 'Success' : 'Pending'}`
+      );
     } catch (err) {
-      console.error('Error loading stats:', err);
-    }
-  };
-
-  const handleAssign = (workflow) => {
-    setSelectedWorkflow(workflow);
-    setShowAssignModal(true);
-  };
-
-  const handleExecute = (workflow) => {
-    setSelectedWorkflow(workflow);
-    setShowExecutionModal(true);
-  };
-
-  const handleAssignmentComplete = () => {
-    setShowAssignModal(false);
-    setSelectedWorkflow(null);
-    loadWorkflows();
-    loadStats();
-  };
-
-  const handleExecutionComplete = () => {
-    setShowExecutionModal(false);
-    setSelectedWorkflow(null);
-    loadStats();
-  };
-
-  const handleUnassign = async (assignmentId) => {
-    if (!window.confirm('Are you sure you want to remove this assignment?')) {
-      return;
-    }
-
-    try {
-      await workflowService.unassignWorkflow(assignmentId);
-      loadWorkflows();
-      loadStats();
-    } catch (err) {
-      console.error('Error unassigning workflow:', err);
-      alert('Failed to remove assignment. Please try again.');
+      console.error('Error executing workflow:', err);
+      alert(`❌ Failed to execute workflow: ${err.message}`);
+    } finally {
+      setExecuting(prev => ({ ...prev, [workflowId]: false }));
     }
   };
 
@@ -97,11 +77,11 @@ const WorkflowsTab = () => {
         <div>
           <h3 className="text-2xl font-bold">N8N Workflow Management</h3>
           <p className="text-gray-400 mt-1">
-            Assign workflows to agents and monitor execution
+            View and execute automated workflows from N8N
           </p>
         </div>
         <button
-          onClick={loadWorkflows}
+          onClick={loadData}
           className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg flex items-center gap-2 transition"
           disabled={loading}
         >
@@ -110,72 +90,66 @@ const WorkflowsTab = () => {
         </button>
       </div>
 
-      {/* Statistics */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <StatCard
-            icon={<Zap className="w-5 h-5" />}
-            label="Total Assignments"
-            value={stats.assignments?.total_assignments || 0}
-            color="purple"
-          />
-          <StatCard
-            icon={<Activity className="w-5 h-5" />}
-            label="Active Workflows"
-            value={stats.assignments?.active_assignments || 0}
-            color="green"
-          />
-          <StatCard
-            icon={<RefreshCw className="w-5 h-5" />}
-            label="Executions (24h)"
-            value={stats.executions_24h?.total || 0}
-            color="blue"
-          />
-          <StatCard
-            icon={<Zap className="w-5 h-5" />}
-            label="Success Rate"
-            value={
-              stats.executions_24h?.total > 0
-                ? `${Math.round((stats.executions_24h.successful / stats.executions_24h.total) * 100)}%`
-                : 'N/A'
-            }
-            color="indigo"
-          />
+      {/* N8N Health Status */}
+      {health && (
+        <div className={`rounded-xl p-4 flex items-center gap-3 ${
+          health.status === 'connected' 
+            ? 'bg-green-500/20 border border-green-500/50' 
+            : 'bg-red-500/20 border border-red-500/50'
+        }`}>
+          {health.status === 'connected' ? (
+            <CheckCircle className="w-5 h-5 text-green-400" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-red-400" />
+          )}
+          <div className="flex-1">
+            <div className="font-medium">
+              N8N Status: {health.status === 'connected' ? 'Connected' : 'Disconnected'}
+            </div>
+            <div className="text-sm text-white/70">
+              {health.n8n_url || 'N8N URL not configured'}
+            </div>
+          </div>
+          {health.status === 'connected' && (
+            <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+              ✓ Online
+            </div>
+          )}
         </div>
       )}
-
-      {/* Filters */}
-      <div className="bg-white/5 rounded-xl p-4">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5" />
-          <span className="font-medium">Filter:</span>
-          <div className="flex gap-2">
-            {['all', 'assigned', 'unassigned'].map((filterType) => (
-              <button
-                key={filterType}
-                onClick={() => setFilter(filterType)}
-                className={`px-4 py-2 rounded-lg capitalize transition ${
-                  filter === filterType
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white/10 text-white/70 hover:bg-white/20'
-                }`}
-              >
-                {filterType}
-              </button>
-            ))}
-          </div>
-          <span className="text-gray-400 ml-auto">
-            {workflows.length} workflows
-          </span>
-        </div>
-      </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-white rounded-lg p-4">
-          {error}
+        <div className="bg-red-500/20 border border-red-500 text-white rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div>
+            <div className="font-medium">Error Loading Workflows</div>
+            <div className="text-sm text-white/80 mt-1">{error}</div>
+          </div>
         </div>
       )}
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          icon={<Server className="w-5 h-5" />}
+          label="N8N Connection"
+          value={health?.status === 'connected' ? 'Connected' : 'Disconnected'}
+          color={health?.status === 'connected' ? 'green' : 'red'}
+        />
+        <StatCard
+          icon={<Zap className="w-5 h-5" />}
+          label="Total Workflows"
+          value={workflows.length}
+          color="purple"
+        />
+        <StatCard
+          icon={<PlayCircle className="w-5 h-5" />}
+          label="Active Workflows"
+          value={workflows.filter(w => w.active).length}
+          color="blue"
+        />
+      </div>
 
       {/* Workflows Grid */}
       {loading ? (
@@ -187,11 +161,9 @@ const WorkflowsTab = () => {
           <Zap className="w-16 h-16 text-white/50 mx-auto mb-4" />
           <p className="text-white text-xl">No workflows found</p>
           <p className="text-white/70 mt-2">
-            {filter === 'assigned'
-              ? 'No workflows are currently assigned to agents'
-              : filter === 'unassigned'
-              ? 'All workflows are assigned'
-              : 'No workflows available in N8N'}
+            {health?.status !== 'connected' 
+              ? 'Cannot connect to N8N. Check your N8N_URL and N8N_API_KEY environment variables.'
+              : 'No workflows available in N8N. Create workflows in your N8N dashboard.'}
           </p>
         </div>
       ) : (
@@ -200,72 +172,11 @@ const WorkflowsTab = () => {
             <WorkflowCard
               key={workflow.id}
               workflow={workflow}
-              onAssign={() => handleAssign(workflow)}
-              onExecute={() => handleExecute(workflow)}
-              onUnassign={handleUnassign}
+              onExecute={() => handleExecuteWorkflow(workflow)}
+              isExecuting={executing[workflow.id]}
             />
           ))}
         </div>
-      )}
-
-      {/* Top Workflows Section */}
-      {stats?.top_workflows && stats.top_workflows.length > 0 && (
-        <div className="bg-white/5 rounded-xl p-6 mt-6">
-          <h2 className="text-xl font-bold mb-4">
-            Most Active Workflows
-          </h2>
-          <div className="space-y-3">
-            {stats.top_workflows.slice(0, 5).map((workflow, index) => (
-              <div
-                key={workflow.workflow_id}
-                className="bg-white/5 rounded-lg p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">
-                      {workflow.workflow_name}
-                    </div>
-                    <div className="text-white/60 text-sm">
-                      ID: {workflow.workflow_id}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-white font-bold">
-                    {workflow.total_executions}
-                  </div>
-                  <div className="text-white/60 text-sm">executions</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Modals */}
-      {showAssignModal && selectedWorkflow && (
-        <AssignmentModal
-          workflow={selectedWorkflow}
-          onClose={() => {
-            setShowAssignModal(false);
-            setSelectedWorkflow(null);
-          }}
-          onComplete={handleAssignmentComplete}
-        />
-      )}
-
-      {showExecutionModal && selectedWorkflow && (
-        <ExecutionModal
-          workflow={selectedWorkflow}
-          onClose={() => {
-            setShowExecutionModal(false);
-            setSelectedWorkflow(null);
-          }}
-          onComplete={handleExecutionComplete}
-        />
       )}
     </div>
   );
@@ -277,7 +188,7 @@ const StatCard = ({ icon, label, value, color }) => {
     purple: 'bg-purple-600',
     green: 'bg-green-600',
     blue: 'bg-blue-600',
-    indigo: 'bg-indigo-600'
+    red: 'bg-red-600'
   };
 
   return (
@@ -288,8 +199,78 @@ const StatCard = ({ icon, label, value, color }) => {
         </div>
         <div>
           <div className="text-white/70 text-sm">{label}</div>
-          <div className="text-white text-2xl font-bold">{value}</div>
+          <div className="text-white text-xl font-bold">{value}</div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Workflow Card Component
+const WorkflowCard = ({ workflow, onExecute, isExecuting }) => {
+  return (
+    <div className="bg-white/5 rounded-xl p-6 hover:bg-white/10 transition">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1">
+          <h3 className="text-lg font-bold text-white mb-1">
+            {workflow.name}
+          </h3>
+          <p className="text-sm text-white/60">
+            ID: {workflow.id}
+          </p>
+        </div>
+        <div className={`px-2 py-1 rounded text-xs font-medium ${
+          workflow.active 
+            ? 'bg-green-500/20 text-green-400' 
+            : 'bg-gray-500/20 text-gray-400'
+        }`}>
+          {workflow.active ? 'Active' : 'Inactive'}
+        </div>
+      </div>
+
+      {/* Tags */}
+      {workflow.tags && workflow.tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {workflow.tags.map((tag, index) => (
+            <span
+              key={index}
+              className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded text-xs"
+            >
+              {tag.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <button
+          onClick={onExecute}
+          disabled={isExecuting || !workflow.active}
+          className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition ${
+            workflow.active
+              ? 'bg-purple-600 hover:bg-purple-700 text-white'
+              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {isExecuting ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Executing...
+            </>
+          ) : (
+            <>
+              <PlayCircle className="w-4 h-4" />
+              Execute
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Metadata */}
+      <div className="mt-4 pt-4 border-t border-white/10 text-xs text-white/50">
+        <div>Created: {new Date(workflow.createdAt).toLocaleDateString()}</div>
+        <div>Updated: {new Date(workflow.updatedAt).toLocaleDateString()}</div>
       </div>
     </div>
   );
