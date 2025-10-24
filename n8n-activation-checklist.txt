@@ -1,0 +1,18 @@
+N8N WORKFLOW ACTIVATION CHECKLIST
+=================================
+
+Open: https://n8n-workflows-production-f039.up.railway.app
+
+For EACH workflow you see:
+[ ] Toggle Active switch to ON (if not already)
+[ ] Click Save
+
+Expected workflows:
+- Batch Agent Portrait Generator
+- Video Creator  
+- Profile Image Creator
+
+After activating all, test backend:
+https://netflixing-admin-backend-production.up.railway.app/api/n8n/test
+
+Should show: "workflows_found": 3

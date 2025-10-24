@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>N8N Workflow Debug Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        .test-box {
+            background: #16213e;
+            border: 2px solid #0f3460;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .success { border-color: #00ff88; }
+        .error { border-color: #ff4444; }
+        button {
+            background: #0f3460;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1a5490;
+        }
+        pre {
+            background: #0a0a1a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 N8N Workflow Debug Test</h1>
+    
+    <div class="test-box">
+        <h2>Test Configuration</h2>
+        <p><strong>Backend URL:</strong> https://netflixing-admin-backend-production.up.railway.app</p>
+        <p><strong>N8N URL:</strong> https://n8n-workflows-production-f039.up.railway.app</p>
+    </div>
+
+    <button onclick="testBackendN8NHealth()">1. Test Backend N8N Health</button>
+    <button onclick="testBackendWorkflows()">2. Test Backend Workflows Endpoint</button>
+    <button onclick="testN8NDirectly()">3. Test N8N API Directly</button>
+    <button onclick="runAllTests()">Run All Tests</button>
+
+    <div id="results"></div>
+
+    <script>
+        const BACKEND_URL = 'https://netflixing-admin-backend-production.up.railway.app';
+        const N8N_URL = 'https://n8n-workflows-production-f039.up.railway.app';
+
+        function log(title, data, isError = false) {
+            const resultsDiv = document.getElementById('results');
+            const testBox = document.createElement('div');
+            testBox.className = 'test-box ' + (isError ? 'error' : 'success');
+            testBox.innerHTML = `
+                <h3>${title}</h3>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(testBox);
+        }
+
+        async function testBackendN8NHealth() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/n8n/health`);
+                const data = await response.json();
+                log('✅ Backend N8N Health', {
+                    status: response.status,
+                    data: data
+                });
+            } catch (error) {
+                log('❌ Backend N8N Health Failed', {
+                    error: error.message
+                }, true);
+            }
+        }
+
+        async function testBackendWorkflows() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/n8n/workflows`);
+                const data = await response.json();
+                log('✅ Backend Workflows Endpoint', {
+                    status: response.status,
+                    total: data.total,
+                    workflows: data.workflows,
+                    raw: data
+                });
+            } catch (error) {
+                log('❌ Backend Workflows Failed', {
+                    error: error.message
+                }, true);
+            }
+        }
+
+        async function testN8NDirectly() {
+            log('⚠️ N8N Direct Test', {
+                note: 'This will likely fail due to CORS, but that\'s expected',
+                message: 'We\'re testing if N8N API is accessible'
+            });
+            
+            try {
+                const response = await fetch(`${N8N_URL}/api/v1/workflows`);
+                const data = await response.json();
+                log('✅ N8N Direct API', {
+                    status: response.status,
+                    data: data
+                });
+            } catch (error) {
+                log('❌ N8N Direct API (Expected - CORS)', {
+                    error: error.message,
+                    note: 'This is normal - N8N API has CORS restrictions'
+                }, true);
+            }
+        }
+
+        async function runAllTests() {
+            document.getElementById('results').innerHTML = '';
+            await testBackendN8NHealth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testBackendWorkflows();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testN8NDirectly();
+        }
+    </script>
+</body>
+</html>
