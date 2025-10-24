@@ -23,13 +23,28 @@ const WorkflowsTab = () => {
       setLoading(true);
       setError(null);
       
+      console.log('===== N8N WORKFLOW DEBUG START =====');
+      
       // Load health status
       const healthData = await workflowService.getHealth();
+      console.log('1. Health data received:', healthData);
       setHealth(healthData);
       
       // Load workflows
       const workflowData = await workflowService.getWorkflows();
-      setWorkflows(workflowData.workflows || []);
+      console.log('2. Workflow data received:', workflowData);
+      console.log('3. Workflows array:', workflowData.workflows);
+      console.log('4. Workflows array length:', workflowData.workflows?.length);
+      console.log('5. Array type check:', Array.isArray(workflowData.workflows));
+      
+      const workflowsToSet = workflowData.workflows || [];
+      console.log('6. Workflows to set in state:', workflowsToSet);
+      console.log('7. Workflows to set length:', workflowsToSet.length);
+      
+      setWorkflows(workflowsToSet);
+      
+      console.log('8. State update called');
+      console.log('===== N8N WORKFLOW DEBUG END =====');
     } catch (err) {
       console.error('Error loading workflows:', err);
       setError(err.message || 'Failed to load N8N workflows');
@@ -152,6 +167,16 @@ const WorkflowsTab = () => {
       </div>
 
       {/* Workflows Grid */}
+      {(() => {
+        console.log('RENDER CHECK:', {
+          loading,
+          workflowsLength: workflows.length,
+          workflows: workflows,
+          isArray: Array.isArray(workflows),
+          showEmpty: workflows.length === 0
+        });
+        return null;
+      })()}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
